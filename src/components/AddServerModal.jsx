@@ -199,6 +199,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
                 <option value="Staging">Staging</option>
                 <option value="Tunnels">Tunnels</option>
                 <option value="VPN">VPN</option>
+                <option value="Websites">Websites</option>
                 <option value="Other">Other</option>
               </select>
             </div>

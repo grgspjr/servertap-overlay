@@ -43,31 +43,31 @@ export default function App() {
       } else {
         // Fallback demo state
         setServers([
-          {
-            id: '1',
-            name: 'App Server (Via Proxy)',
-            host: '192.168.10.31',
-            type: 'ssh',
-            port: 22,
-            username: 'appuser',
-            environment: 'Production',
-            tags: ['app-server', 'reverse-proxy', 'linux'],
-            notes: 'Routes via Reverse Proxy 192.168.15.58',
-            proxyType: 'jump',
-            proxyHost: '192.168.15.58',
-            proxyUsername: 'proxyuser',
-            status: 'online',
-            latency: 18,
-          },
+          //{
+          //  id: '1',
+          //  name: 'App Server (Via Proxy)',
+          //  host: '192.168.10.31',
+          //  type: 'ssh',
+          //  port: 22,
+          //  username: 'appuser',
+          //  environment: 'Production',
+          //  tags: ['app-server', 'reverse-proxy', 'linux'],
+          //  notes: 'Routes via Reverse Proxy 192.168.15.58',
+          //  proxyType: 'jump',
+          //  proxyHost: '192.168.15.58',
+          //  proxyUsername: 'proxyuser',
+          //  status: 'online',
+          //  latency: 18,
+          //},
           {
             id: '2',
-            name: 'Prod K8s Master 01',
+            name: 'Prod Master 01',
             host: '192.168.1.100',
             type: 'ssh',
             port: 22,
             username: 'root',
             environment: 'Production',
-            tags: ['k8s', 'production', 'linux'],
+            tags: ['production', 'linux'],
             notes: 'Primary Kubernetes Master Node',
             status: 'online',
             latency: 14,
@@ -273,7 +273,7 @@ export default function App() {
     return matchesSearch && matchesEnv;
   });
 
-  const environments = ['Production', 'Staging', 'Tunnels', 'VPN', 'Other'];
+  const environments = ['Production', 'Staging', 'Tunnels', 'VPN', 'Websites', 'Other'];
 
   // Reorder Server Position
   const handleMoveServer = (index, direction) => {

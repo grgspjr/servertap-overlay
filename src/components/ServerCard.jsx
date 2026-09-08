@@ -28,6 +28,10 @@ export default function ServerCard({ server, index, isFirst, isLast, onLaunchSsh
       badge: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
       dot: 'bg-cyan-500',
     },
+    Websites: {
+      badge: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
+      dot: 'bg-teal-500',
+    },
     Other: {
       badge: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
       dot: 'bg-slate-500',
