@@ -1,0 +1,40 @@
+{
+  "name": "servertap-devops-overlay",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Ultra-fast DevOps Screen Overlay Launcher for 1-tap SSH and RDP connection",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"electron .\"",
+    "build:react": "vite build",
+    "build": "vite build && electron-builder",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "devops",
+    "ssh",
+    "rdp",
+    "screen-overlay",
+    "productivity",
+    "server-management"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "dependencies": {
+    "lucide-react": "^0.344.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.64",
+    "@types/react-dom": "^18.2.21",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.5.4",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^29.1.1",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^3.4.19",
+    "vite": "^5.1.6"
+  }
+}
