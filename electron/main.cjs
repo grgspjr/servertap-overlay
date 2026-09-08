@@ -10,17 +10,51 @@ let mainWindow = null;
 let tray = null;
 
 function getUserDataPath() {
+  let targetDir = null;
   try {
     if (app.isReady()) {
-      return app.getPath('userData');
+      targetDir = app.getPath('userData');
     }
   } catch (e) {}
-  const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-  const dir = path.join(appData, 'servertap-devops-overlay');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+
+  if (!targetDir) {
+    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    targetDir = path.join(appData, 'servertap-devops-overlay');
   }
-  return dir;
+
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  // Automatic Migration Check from legacy folder paths
+  try {
+    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    const legacyDirs = [
+      path.join(appData, 'servertap-devops-overlay'),
+      path.join(appData, 'servertap-overlay'),
+      path.join(appData, 'ServerTap DevOps Overlay')
+    ];
+
+    for (const legacyDir of legacyDirs) {
+      if (legacyDir.toLowerCase() !== targetDir.toLowerCase() && fs.existsSync(legacyDir)) {
+        const legacyServers = path.join(legacyDir, 'servers.json');
+        const currentServers = path.join(targetDir, 'servers.json');
+        if (fs.existsSync(legacyServers) && !fs.existsSync(currentServers)) {
+          fs.copyFileSync(legacyServers, currentServers);
+          console.log(`Migrated servers.json from ${legacyDir} to ${targetDir}`);
+        }
+        const legacySettings = path.join(legacyDir, 'settings.json');
+        const currentSettings = path.join(targetDir, 'settings.json');
+        if (fs.existsSync(legacySettings) && !fs.existsSync(currentSettings)) {
+          fs.copyFileSync(legacySettings, currentSettings);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Data migration error:', err);
+  }
+
+  return targetDir;
 }
 
 const getServersFilePath = () => path.join(getUserDataPath(), 'servers.json');

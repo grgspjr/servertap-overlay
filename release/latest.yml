@@ -1,8 +1,8 @@
 version: 1.0.0
 files:
   - url: ServerTap-DevOps-Overlay-Setup-1.0.0.exe
-    sha512: xVyAjZ9LEP/89nsBZ8WseVtub8CWLMgAaWfN48QQE9pjpNU0P6MwbvDqaVscyHXmW08hOc8zruku+3x2CCuwZA==
-    size: 77763742
+    sha512: U4t+C9/K7G4N5GG7Y5SEw7+ZVnDrAwB/NJXXi3lwi4q+RjoVLGN0jSi8Q2mM7ufG0uMHUNsw4XLP9SbWsqYmVQ==
+    size: 77764035
 path: ServerTap-DevOps-Overlay-Setup-1.0.0.exe
-sha512: xVyAjZ9LEP/89nsBZ8WseVtub8CWLMgAaWfN48QQE9pjpNU0P6MwbvDqaVscyHXmW08hOc8zruku+3x2CCuwZA==
-releaseDate: '2026-09-08T11:57:29.361Z'
+sha512: U4t+C9/K7G4N5GG7Y5SEw7+ZVnDrAwB/NJXXi3lwi4q+RjoVLGN0jSi8Q2mM7ufG0uMHUNsw4XLP9SbWsqYmVQ==
+releaseDate: '2026-09-08T13:11:15.038Z'
