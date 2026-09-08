@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "concurrently \"vite\" \"electron .\"",
     "build:react": "vite build",
-    "build": "vite build && electron-builder",
+    "build": "vite build && npx electron-builder",
     "preview": "vite preview"
   },
   "keywords": [

@@ -1,0 +1,4 @@
+owner: gsanpedro
+repo: servertap-overlay
+provider: github
+updaterCacheDirName: servertap-devops-overlay-updater
