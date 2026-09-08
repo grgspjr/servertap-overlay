@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, clipboard, screen } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -274,6 +275,11 @@ if (!gotTheLock) {
     registerHotkeys();
     setupTray();
 
+    // Check for updates 5 seconds after startup
+    setTimeout(() => {
+      autoUpdater.checkForUpdatesAndNotify().catch((err) => console.log('Auto update check:', err.message));
+    }, 5000);
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
@@ -286,6 +292,19 @@ app.on('will-quit', () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// Auto-Updater IPCs
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    return await autoUpdater.checkForUpdatesAndNotify();
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('restart-and-install-update', () => {
+  autoUpdater.quitAndInstall();
 });
 
 // IPC Communication Handlers

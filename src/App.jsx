@@ -16,6 +16,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEnv, setSelectedEnv] = useState('All');
   const [toast, setToast] = useState(null);
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateDownloaded, setUpdateDownloaded] = useState(false);
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -26,6 +28,20 @@ export default function App() {
   // Initial load
   useEffect(() => {
     loadData();
+    if (window.api) {
+      if (window.api.onUpdateAvailable) {
+        window.api.onUpdateAvailable((info) => {
+          setUpdateInfo(info);
+          showToast(`🚀 ServerTap ${info.version} is available! Downloading update...`, 'info');
+        });
+      }
+      if (window.api.onUpdateDownloaded) {
+        window.api.onUpdateDownloaded((info) => {
+          setUpdateDownloaded(true);
+          showToast(`✅ ServerTap ${info.version} downloaded! Click Restart to apply.`, 'success');
+        });
+      }
+    }
   }, []);
 
   const showToast = (message, type = 'info') => {
@@ -305,6 +321,22 @@ export default function App() {
         serverCount={servers.length}
         environments={environments}
       />
+
+      {/* Auto-Update Notification Banner */}
+      {updateDownloaded && (
+        <div className="bg-gradient-to-r from-emerald-600 to-cyan-600 px-4 py-2 text-white text-xs font-semibold flex items-center justify-between shadow-lg animate-fade-in flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span>ServerTap {updateInfo?.version || 'Update'} is ready to install!</span>
+          </div>
+          <button
+            onClick={() => window.api && window.api.restartAndInstallUpdate()}
+            className="px-3 py-1 bg-white text-emerald-900 rounded-md hover:bg-emerald-50 text-xs font-bold transition shadow-sm"
+          >
+            Restart & Update Now
+          </button>
+        </div>
+      )}
 
       {/* Main Server Cards View Grid */}
       <main className="flex-1 overflow-y-auto pr-1">

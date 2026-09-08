@@ -22,4 +22,10 @@ contextBridge.exposeInMainWorld('api', {
   toggleAlwaysOnTop: (flag) => ipcRenderer.invoke('toggle-always-on-top', flag),
   toggleDockMode: (expand) => ipcRenderer.invoke('toggle-dock-mode', expand),
   resizeWindow: (dimensions) => ipcRenderer.invoke('resize-window', dimensions),
+
+  // Auto-Updater
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  restartAndInstallUpdate: () => ipcRenderer.invoke('restart-and-install-update'),
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (event, info) => callback(info)),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (event, info) => callback(info)),
 });
