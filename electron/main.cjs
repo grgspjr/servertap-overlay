@@ -62,13 +62,29 @@ const getSettingsFilePath = () => path.join(getUserDataPath(), 'settings.json');
 
 // Default initial settings
 const defaultSettings = {
-  hotkey: 'Shift+Home',
+  hotkey: 'Ctrl+Alt+S',
   alwaysOnTop: true,
   startMinimized: false,
+  autoStartOnBoot: true,
   overlayOpacity: 0.95,
   pingIntervalMs: 30000,
   defaultTerminal: 'cmd.exe',
 };
+
+function configureAutoStart(enable) {
+  try {
+    if (process.platform === 'win32') {
+      app.setLoginItemSettings({
+        openAtLogin: enable !== false,
+        path: app.getPath('exe'),
+        args: ['--hidden']
+      });
+      console.log(`Windows Auto-Start on boot configured: ${enable !== false}`);
+    }
+  } catch (err) {
+    console.error('Failed to set login item settings:', err);
+  }
+}
 
 // Default sample servers for DevOps onboarding
 const sampleServers = [
@@ -188,9 +204,15 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
   }
 
-  mainWindow.show();
-  mainWindow.focus();
-  mainWindow.center();
+  const isHiddenLaunch = process.argv.includes('--hidden');
+
+  if (isHiddenLaunch) {
+    mainWindow.hide();
+  } else {
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.center();
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -305,6 +327,8 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    const settings = loadJsonFile(getSettingsFilePath(), defaultSettings);
+    configureAutoStart(settings.autoStartOnBoot !== false);
     createWindow();
     registerHotkeys();
     setupTray();
@@ -609,6 +633,7 @@ ipcMain.handle('get-active-hotkey', async () => {
 
 ipcMain.handle('save-settings', async (event, settings) => {
   const result = saveJsonFile(getSettingsFilePath(), settings);
+  configureAutoStart(settings.autoStartOnBoot !== false);
   registerHotkeys();
   if (mainWindow && settings.alwaysOnTop !== undefined) {
     mainWindow.setAlwaysOnTop(settings.alwaysOnTop);

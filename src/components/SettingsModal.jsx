@@ -5,6 +5,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
   const [hotkey, setHotkey] = useState('Ctrl+Alt+S');
   const [alwaysOnTop, setAlwaysOnTop] = useState(true);
   const [defaultTerminal, setDefaultTerminal] = useState('cmd.exe');
+  const [autoStartOnBoot, setAutoStartOnBoot] = useState(true);
   const [savedMsg, setSavedMsg] = useState(false);
 
   useEffect(() => {
@@ -12,6 +13,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
       setHotkey(settings.hotkey || 'Ctrl+Alt+S');
       setAlwaysOnTop(settings.alwaysOnTop !== false);
       setDefaultTerminal(settings.defaultTerminal || 'cmd.exe');
+      setAutoStartOnBoot(settings.autoStartOnBoot !== false);
     }
   }, [settings, isOpen]);
 
@@ -23,6 +25,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
       hotkey,
       alwaysOnTop,
       defaultTerminal,
+      autoStartOnBoot,
     };
     onSaveSettings(updated);
     setSavedMsg(true);
@@ -115,6 +118,20 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
               type="checkbox"
               checked={alwaysOnTop}
               onChange={(e) => setAlwaysOnTop(e.target.checked)}
+              className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 bg-slate-900 border-slate-700 cursor-pointer"
+            />
+          </div>
+
+          {/* Auto-Start on Boot */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/60 border border-white/5">
+            <div>
+              <div className="font-semibold text-slate-200">Run on Windows Startup</div>
+              <div className="text-[11px] text-slate-400">Launch silently in background when Windows boots</div>
+            </div>
+            <input
+              type="checkbox"
+              checked={autoStartOnBoot}
+              onChange={(e) => setAutoStartOnBoot(e.target.checked)}
               className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 bg-slate-900 border-slate-700 cursor-pointer"
             />
           </div>
