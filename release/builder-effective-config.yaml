@@ -1,0 +1,19 @@
+directories:
+  output: release
+  buildResources: build
+appId: com.servertap.devopsoverlay
+productName: ServerTap DevOps Overlay
+files:
+  - filter:
+      - dist/**/*
+      - electron/**/*
+      - package.json
+publish:
+  - provider: github
+    owner: gsanpedro
+    repo: servertap-overlay
+win:
+  target:
+    - nsis
+    - portable
+electronVersion: 29.4.6

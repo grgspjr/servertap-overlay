@@ -1,6 +1,6 @@
 {
   "name": "servertap-devops-overlay",
-  "version": "1.0.0",
+  "version": "2.1.1",
   "type": "module",
   "description": "Ultra-fast DevOps Screen Overlay Launcher for 1-tap SSH and RDP connection",
   "main": "electron/main.cjs",
