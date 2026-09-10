@@ -102,19 +102,7 @@ const sampleServers = [
     proxyHost: '192.168.15.58',
     proxyUsername: 'proxyuser',
   },
-  {
-    id: '2',
-    name: 'Prod K8s Master 01',
-    host: '192.168.1.100',
-    type: 'ssh',
-    port: 22,
-    username: 'root',
-    environment: 'Production',
-    tags: ['k8s', 'production', 'linux'],
-    notes: 'Primary Kubernetes Master Node',
-    authType: 'key',
-    keyPath: '~/.ssh/id_rsa_prod',
-  },
+  
   {
     id: '3',
     name: 'Windows Domain Controller',
@@ -126,29 +114,7 @@ const sampleServers = [
     tags: ['windows', 'ad', 'infrastructure'],
     notes: 'Active Directory Domain Controller 01',
   },
-  {
-    id: '4',
-    name: 'Staging API Webserver',
-    host: 'staging-api.internal.net',
-    type: 'ssh',
-    port: 2222,
-    username: 'devops',
-    environment: 'Staging',
-    tags: ['api', 'staging', 'docker'],
-    notes: 'Docker Swarm Staging cluster node',
-    customCommand: 'docker ps',
-  },
-  {
-    id: '5',
-    name: 'Dev PostgreSQL DB',
-    host: 'dev-db.internal.net',
-    type: 'ssh',
-    port: 22,
-    username: 'postgres',
-    environment: 'Development',
-    tags: ['database', 'dev', 'postgres'],
-    notes: 'Development Database Instance',
-  },
+  
 ];
 
 function loadJsonFile(filepath, fallback) {
@@ -685,5 +651,79 @@ ipcMain.handle('toggle-dock-mode', (event, expand) => {
 ipcMain.handle('resize-window', (event, { width, height }) => {
   if (mainWindow) {
     mainWindow.setSize(width, height);
+  }
+});
+
+// 1. Return dynamic app version to UI
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+// 2. Launch Website in Microsoft Edge & Auto-Type Credentials
+ipcMain.handle('launch-website', async (event, server) => {
+  try {
+    let url = server.host.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+
+    const { username, password } = server;
+
+    // 1. Copy password to clipboard as a 1-tap backup
+    if (password && password.trim() !== '') {
+      try {
+        clipboard.writeText(password.trim());
+      } catch (e) {}
+    }
+
+    // 2. Launch ONLY Microsoft Edge (Single Window)
+    const cmd = `start msedge "${url}"`;
+    exec(cmd, { shell: 'cmd.exe' });
+
+    // 3. If credentials exist, run background PowerShell Set-Clipboard + Ctrl+V script for 100% unescaped literal character support
+    if (username || password) {
+      const escapePsSingleQuote = (str) => {
+        if (!str) return '';
+        return str.replace(/'/g, "''");
+      };
+
+      const userStr = escapePsSingleQuote(username);
+      const passStr = escapePsSingleQuote(password);
+
+      // PowerShell script: Uses Set-Clipboard + Ctrl+V (^v) so ALL characters (@, #, $, %, +, ^, ~, !, *, {, }, etc.) paste 100% literally!
+      const psScript = `
+        $wshell = New-Object -ComObject wscript.shell;
+        $wshell.AppActivate('Edge');
+        Start-Sleep -Milliseconds 2500;
+
+        # Move focus from Address Bar to Username Input Box
+        $wshell.SendKeys('{TAB}');
+        Start-Sleep -Milliseconds 300;
+
+        if ('${userStr}') {
+          Set-Clipboard -Value '${userStr}';
+          $wshell.SendKeys('^v');
+          Start-Sleep -Milliseconds 400;
+        }
+
+        # Tab to Password Input Box
+        $wshell.SendKeys('{TAB}');
+        Start-Sleep -Milliseconds 300;
+
+        if ('${passStr}') {
+          Set-Clipboard -Value '${passStr}';
+          $wshell.SendKeys('^v');
+          Start-Sleep -Milliseconds 400;
+        }
+
+        $wshell.SendKeys('{ENTER}');
+      `;
+
+      const encodedScript = Buffer.from(psScript, 'utf16le').toString('base64');
+      exec(`powershell -EncodedCommand ${encodedScript}`, { shell: 'cmd.exe' });
+    }
+
+    return { success: true, autoLoggedIn: !!(username || password) };
+  } catch (err) {
+    return { success: false, error: err.message };
   }
 });

@@ -4,7 +4,7 @@ contextBridge.exposeInMainWorld('api', {
   // Launchers
   launchSsh: (server) => ipcRenderer.invoke('launch-ssh', server),
   launchRdp: (server) => ipcRenderer.invoke('launch-rdp', server),
-  
+
   // Network & Config
   pingHost: (data) => ipcRenderer.invoke('ping-host', data),
   importSshConfig: () => ipcRenderer.invoke('import-ssh-config'),
@@ -28,4 +28,8 @@ contextBridge.exposeInMainWorld('api', {
   restartAndInstallUpdate: () => ipcRenderer.invoke('restart-and-install-update'),
   onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (event, info) => callback(info)),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (event, info) => callback(info)),
+
+  // Expose version & website launcher in preload.cjs
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  launchWebsite: (server) => ipcRenderer.invoke('launch-website', server),
 });

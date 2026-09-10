@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Terminal, Monitor, Copy, Check, Edit2, Trash2, Shield, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
+import { Globe, Terminal, Monitor, Copy, Check, Edit2, Trash2, Shield, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
 
-export default function ServerCard({ server, index, isFirst, isLast, onLaunchSsh, onLaunchRdp, onEdit, onDelete, onPing, onMoveUp, onMoveDown }) {
+export default function ServerCard({ server, index, isFirst, isLast, onLaunchSsh, onLaunchRdp, onLaunchWebsite, onEdit, onDelete, onPing, onMoveUp, onMoveDown }) {
   const [copied, setCopied] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [pinging, setPinging] = useState(false);
@@ -157,7 +157,16 @@ export default function ServerCard({ server, index, isFirst, isLast, onLaunchSsh
             <span>SSH Connect</span>
           </button>
         )}
-
+        {(server.type === 'website' || server.environment === 'Websites') && (
+          <button
+            onClick={() => onLaunchWebsite(server)}
+            className="flex-1 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 font-bold text-white py-1.5 px-3 rounded-md text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98] shadow-md shadow-teal-600/30"
+            title="Open in Microsoft Edge"
+          >
+            <Globe className="w-3.5 h-3.5 text-teal-200" />
+            <span>1-Tap Edge</span>
+            </button>
+        )}
         {(server.type === 'rdp' || server.type === 'both') && (
           <button
             onClick={() => onLaunchRdp(server)}

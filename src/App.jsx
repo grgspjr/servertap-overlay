@@ -18,6 +18,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [updateInfo, setUpdateInfo] = useState(null);
   const [updateDownloaded, setUpdateDownloaded] = useState(false);
+  const [appVersion, setAppVersion] = useState('2.1.1');
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -41,6 +42,9 @@ export default function App() {
           showToast(`✅ ServerTap ${info.version} downloaded! Click Restart to apply.`, 'success');
         });
       }
+    }
+    if (window.api && window.api.getAppVersion) {
+    window.api.getAppVersion().then((v) => setAppVersion(v));
     }
   }, []);
 
@@ -166,6 +170,18 @@ export default function App() {
       }
     } else {
       showToast(`[Demo] Executing: mstsc.exe /v:${server.host}:${server.port || 3389}`, 'rdp');
+    }
+  };
+
+  const handleLaunchWebsite = async (server) => {
+    if (window.api && window.api.launchWebsite) {
+      showToast(`1-Tap Web: Opening Edge & Auto-Logging in to ${server.name}...`, 'info');
+      const res = await window.api.launchWebsite(server);
+      if (res.autoLoggedIn) {
+        showToast('Auto-filling credentials & submitting login form...', 'info');
+      }
+    } else {
+      window.open(server.host.startsWith('http') ? server.host : `https://${server.host}`, '_blank');
     }
   };
 
@@ -382,6 +398,7 @@ export default function App() {
                 isLast={idx === filteredServers.length - 1}
                 onLaunchSsh={handleLaunchSsh}
                 onLaunchRdp={handleLaunchRdp}
+                onLaunchWebsite={handleLaunchWebsite}
                 onEdit={(srv) => {
                   setEditingServer(srv);
                   setIsAddModalOpen(true);
@@ -416,7 +433,7 @@ export default function App() {
         <div className="flex items-center gap-2">
           <span>{filteredServers.length} servers listed</span>
           <span className="text-slate-600">•</span>
-          <span className="text-slate-400">ServerTap v1.0</span>
+          <span className="text-slate-400">ServerTap v{appVersion}</span>
         </div>
       </footer>
 

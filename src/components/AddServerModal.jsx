@@ -176,14 +176,20 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
                 onChange={(e) => {
                   const newType = e.target.value;
                   let newPort = formData.port;
+                  let newEnv = formData.environment;
                   if (newType === 'rdp') newPort = '3389';
                   if (newType === 'ssh') newPort = '22';
-                  setFormData({ ...formData, type: newType, port: newPort });
+                  if (newType === 'website') {
+                    newPort = '443';
+                    newEnv = 'Websites';
+                  }
+                  setFormData({ ...formData, type: newType, port: newPort, environment: newEnv });
                 }}
                 className="w-full px-3 py-2 bg-slate-800/80 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500"
               >
                 <option value="ssh">SSH (Linux/Unix)</option>
                 <option value="rdp">RDP (Windows)</option>
+                <option value="website">Website (Web Portal / Cloudflare)</option>
                 <option value="both">Both (SSH & RDP)</option>
               </select>
             </div>
