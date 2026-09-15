@@ -23,6 +23,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
     proxyKeyPath: '',
     proxyPassword: '',
     password: '',
+    browserEngine: 'external',
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -50,6 +51,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
         proxyKeyPath: editingServer.proxyKeyPath || '',
         proxyPassword: editingServer.proxyPassword || '',
         password: editingServer.password || '',
+        browserEngine: editingServer.browserEngine || 'external',
       });
     } else {
       setFormData({
@@ -73,6 +75,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
         proxyKeyPath: '',
         proxyPassword: '',
         password: '',
+        browserEngine: 'external',
       });
     }
   }, [editingServer, isOpen]);
@@ -110,6 +113,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
       proxyKeyPath: formData.proxyKeyPath.trim(),
       proxyPassword: formData.proxyPassword.trim(),
       password: formData.password.trim(),
+      browserEngine: formData.browserEngine || 'external',
     };
 
     onSave(savedData);
@@ -214,7 +218,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
               <label className="block text-xs font-semibold text-slate-300 mb-1">Port</label>
               <input
                 type="number"
-                placeholder={formData.type === 'rdp' ? '3389' : '22'}
+                placeholder={formData.type === 'rdp' ? '3389' : (formData.type === 'website' ? '443' : '22')}
                 value={formData.port}
                 onChange={(e) => setFormData({ ...formData, port: e.target.value })}
                 className="w-full px-3 py-2 bg-slate-800/80 border border-white/10 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-cyan-500"

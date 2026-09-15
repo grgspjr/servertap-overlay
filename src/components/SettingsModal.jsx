@@ -5,6 +5,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
   const [hotkey, setHotkey] = useState('Ctrl+Alt+S');
   const [alwaysOnTop, setAlwaysOnTop] = useState(true);
   const [defaultTerminal, setDefaultTerminal] = useState('cmd.exe');
+  const [defaultBrowserEngine, setDefaultBrowserEngine] = useState('external');
   const [autoStartOnBoot, setAutoStartOnBoot] = useState(true);
   const [savedMsg, setSavedMsg] = useState(false);
 
@@ -13,6 +14,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
       setHotkey(settings.hotkey || 'Ctrl+Alt+S');
       setAlwaysOnTop(settings.alwaysOnTop !== false);
       setDefaultTerminal(settings.defaultTerminal || 'cmd.exe');
+      setDefaultBrowserEngine(settings.defaultBrowserEngine || 'external');
       setAutoStartOnBoot(settings.autoStartOnBoot !== false);
     }
   }, [settings, isOpen]);
@@ -25,6 +27,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
       hotkey,
       alwaysOnTop,
       defaultTerminal,
+      defaultBrowserEngine,
       autoStartOnBoot,
     };
     onSaveSettings(updated);
@@ -107,6 +110,8 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
               Command execution spawns native Windows OpenSSH in your selected shell.
             </p>
           </div>
+
+
 
           {/* Always on Top */}
           <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/60 border border-white/5">

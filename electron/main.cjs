@@ -3,8 +3,10 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const net = require('net');
+const http = require('http');
+const WebSocket = require('ws');
 
 let mainWindow = null;
 let tray = null;
@@ -69,6 +71,7 @@ const defaultSettings = {
   overlayOpacity: 0.95,
   pingIntervalMs: 30000,
   defaultTerminal: 'cmd.exe',
+  defaultBrowserEngine: 'inapp',
 };
 
 function configureAutoStart(enable) {
@@ -658,10 +661,12 @@ ipcMain.handle('resize-window', (event, { width, height }) => {
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
-// 2. Launch Website in Microsoft Edge & Auto-Type Credentials
+// 2. Launch Website in Microsoft Edge & Auto-Fill Credentials via Windows UI Automation Sidecar
 ipcMain.handle('launch-website', async (event, server) => {
   try {
-    let url = server.host.trim();
+    let url = server.host ? server.host.trim() : '';
+    if (!url) return { success: false, error: 'Empty URL provided' };
+
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
@@ -675,54 +680,26 @@ ipcMain.handle('launch-website', async (event, server) => {
       } catch (e) {}
     }
 
-    // 2. Launch ONLY Microsoft Edge (Single Window)
+    // 2. Launch Microsoft Edge natively in user's default browser window
     const cmd = `start msedge "${url}"`;
     exec(cmd, { shell: 'cmd.exe' });
 
-    // 3. If credentials exist, run background PowerShell Set-Clipboard + Ctrl+V script for 100% unescaped literal character support
+    // 3. Execute ServerTap Windows UI Automation Sidecar (Native OS Accessibility API)
     if (username || password) {
-      const escapePsSingleQuote = (str) => {
-        if (!str) return '';
-        return str.replace(/'/g, "''");
-      };
+      const sidecarExe = path.join(__dirname, 'ServerTapUiaSidecar.exe');
+      const uStr = username ? username.trim() : '';
+      const pStr = password ? password.trim() : '';
 
-      const userStr = escapePsSingleQuote(username);
-      const passStr = escapePsSingleQuote(password);
-
-      // PowerShell script: Uses Set-Clipboard + Ctrl+V (^v) so ALL characters (@, #, $, %, +, ^, ~, !, *, {, }, etc.) paste 100% literally!
-      const psScript = `
-        $wshell = New-Object -ComObject wscript.shell;
-        $wshell.AppActivate('Edge');
-        Start-Sleep -Milliseconds 2500;
-
-        # Move focus from Address Bar to Username Input Box
-        $wshell.SendKeys('{TAB}');
-        Start-Sleep -Milliseconds 300;
-
-        if ('${userStr}') {
-          Set-Clipboard -Value '${userStr}';
-          $wshell.SendKeys('^v');
-          Start-Sleep -Milliseconds 400;
-        }
-
-        # Tab to Password Input Box
-        $wshell.SendKeys('{TAB}');
-        Start-Sleep -Milliseconds 300;
-
-        if ('${passStr}') {
-          Set-Clipboard -Value '${passStr}';
-          $wshell.SendKeys('^v');
-          Start-Sleep -Milliseconds 400;
-        }
-
-        $wshell.SendKeys('{ENTER}');
-      `;
-
-      const encodedScript = Buffer.from(psScript, 'utf16le').toString('base64');
-      exec(`powershell -EncodedCommand ${encodedScript}`, { shell: 'cmd.exe' });
+      if (fs.existsSync(sidecarExe)) {
+        execFile(sidecarExe, [url, uStr, pStr], (err, stdout, stderr) => {
+          if (err) {
+            console.error('UIA Sidecar execution error:', err);
+          }
+        });
+      }
     }
 
-    return { success: true, autoLoggedIn: !!(username || password) };
+    return { success: true, mode: 'external', autoLoggedIn: !!(username || password) };
   } catch (err) {
     return { success: false, error: err.message };
   }
