@@ -1,6 +1,9 @@
 using System;
 using System.Diagnostics;
+using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Threading;
+using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Forms;
 
@@ -8,6 +11,12 @@ namespace ServerTap
 {
     class UiaAutoFill
     {
+        [DllImport("user32.dll")]
+        static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, int dwExtraInfo);
+
+        const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
+        const uint MOUSEEVENTF_LEFTUP = 0x0004;
+
         [STAThread]
         static void Main(string[] args)
         {
@@ -20,13 +29,11 @@ namespace ServerTap
             bool isHris = targetUrl.ToLower().Contains("hris");
             bool isFlutter = targetUrl.ToLower().Contains("ess");
 
-            // Allow ExtJS / HRIS an initial settlement delay so Ext.Viewport finishes mounting
-            if (isHris)
+            if (isHris || isFlutter)
             {
-                Thread.Sleep(800);
+                Thread.Sleep(900);
             }
 
-            // Poll up to 35 attempts (14 seconds total) for Edge window and Web Document
             for (int attempt = 0; attempt < 35; attempt++)
             {
                 Thread.Sleep(350);
@@ -47,7 +54,6 @@ namespace ServerTap
                         Process p = Process.GetProcessById(pid);
                         if (p != null && p.ProcessName.ToLower().Contains("edge"))
                         {
-                            // Target Web Page Document ONLY (filters out Edge Address Bar)
                             Condition docCond = new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Document);
                             AutomationElement doc = win.FindFirst(TreeScope.Descendants, docCond);
 
@@ -63,7 +69,7 @@ namespace ServerTap
                                 Condition passCond = new PropertyCondition(AutomationElement.IsPasswordProperty, true);
                                 passEdit = doc.FindFirst(TreeScope.Descendants, passCond);
 
-                                // 2. EXPLICIT USERNAME FIELD IDENTIFICATION (non-password Edit or ValuePattern element)
+                                // 2. EXPLICIT USERNAME FIELD IDENTIFICATION
                                 Condition editCond = new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit);
                                 AutomationElementCollection pageEdits = doc.FindAll(TreeScope.Descendants, editCond);
 
@@ -174,19 +180,27 @@ namespace ServerTap
                                 {
                                     try
                                     {
-                                        doc.SetFocus();
-                                        Thread.Sleep(200);
+                                        // Click inside web document viewport canvas to pull focus off Edge tab bar!
+                                        Rect rect = doc.Current.BoundingRectangle;
+                                        if (rect.Width > 0 && rect.Height > 0)
+                                        {
+                                            int clickX = (int)(rect.Left + (rect.Width / 2));
+                                            int clickY = (int)(rect.Top + (rect.Height / 3));
+                                            Cursor.Position = new System.Drawing.Point(clickX, clickY);
+                                            mouse_event(MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+                                            Thread.Sleep(200);
+                                        }
 
                                         SendKeys.SendWait("{TAB}");
-                                        Thread.Sleep(100);
+                                        Thread.Sleep(150);
                                         SendKeys.SendWait("^a{BACKSPACE}");
                                         SendKeys.SendWait(username);
-                                        Thread.Sleep(150);
+                                        Thread.Sleep(200);
                                         SendKeys.SendWait("{TAB}");
-                                        Thread.Sleep(100);
+                                        Thread.Sleep(150);
                                         SendKeys.SendWait("^a{BACKSPACE}");
                                         SendKeys.SendWait(password);
-                                        Thread.Sleep(150);
+                                        Thread.Sleep(200);
                                         SendKeys.SendWait("{ENTER}");
                                         return;
                                     }
