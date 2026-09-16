@@ -1,13 +1,94 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, clipboard, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, clipboard, screen, safeStorage } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const net = require('net');
+const http = require('http');
+const WebSocket = require('ws');
 
 let mainWindow = null;
 let tray = null;
+
+// Hardware-Backed Password Encryption via Electron safeStorage (Windows DPAPI)
+function encryptSecret(plainText) {
+  if (!plainText || typeof plainText !== 'string' || plainText.trim() === '') return plainText;
+  if (plainText.startsWith('enc:')) return plainText;
+  try {
+    if (safeStorage && safeStorage.isEncryptionAvailable()) {
+      const buffer = safeStorage.encryptString(plainText);
+      return 'enc:' + buffer.toString('base64');
+    }
+  } catch (err) {
+    console.error('Error encrypting secret:', err);
+  }
+  return plainText;
+}
+
+function decryptSecret(cipherText) {
+  if (!cipherText || typeof cipherText !== 'string' || !cipherText.startsWith('enc:')) return cipherText;
+  try {
+    if (safeStorage && safeStorage.isEncryptionAvailable()) {
+      const base64Data = cipherText.slice(4);
+      const buffer = Buffer.from(base64Data, 'base64');
+      return safeStorage.decryptString(buffer);
+    }
+  } catch (err) {
+    console.error('Error decrypting secret:', err);
+  }
+  return cipherText;
+}
+
+function sanitizeServerForStorage(server) {
+  if (!server) return server;
+  return {
+    ...server,
+    password: encryptSecret(server.password),
+    proxyPassword: encryptSecret(server.proxyPassword),
+    keyPassphrase: encryptSecret(server.keyPassphrase),
+  };
+}
+
+function prepareServerFromStorage(server) {
+  if (!server) return server;
+  return {
+    ...server,
+    password: decryptSecret(server.password),
+    proxyPassword: decryptSecret(server.proxyPassword),
+    keyPassphrase: decryptSecret(server.keyPassphrase),
+  };
+}
+
+function sanitizeSettingsForStorage(settings) {
+  if (!settings) return settings;
+  let proxyProfiles = settings.proxyProfiles;
+  if (Array.isArray(proxyProfiles)) {
+    proxyProfiles = proxyProfiles.map((profile) => ({
+      ...profile,
+      proxyPassword: encryptSecret(profile.proxyPassword),
+    }));
+  }
+  return {
+    ...settings,
+    proxyProfiles,
+  };
+}
+
+function prepareSettingsFromStorage(settings) {
+  if (!settings) return settings;
+  let proxyProfiles = settings.proxyProfiles;
+  if (Array.isArray(proxyProfiles)) {
+    proxyProfiles = proxyProfiles.map((profile) => ({
+      ...profile,
+      proxyPassword: decryptSecret(profile.proxyPassword),
+    }));
+  }
+  return {
+    ...settings,
+    proxyProfiles,
+  };
+}
 
 function getUserDataPath() {
   let targetDir = null;
@@ -69,6 +150,7 @@ const defaultSettings = {
   overlayOpacity: 0.95,
   pingIntervalMs: 30000,
   defaultTerminal: 'cmd.exe',
+  defaultBrowserEngine: 'inapp',
 };
 
 function configureAutoStart(enable) {
@@ -91,15 +173,15 @@ const sampleServers = [
   {
     id: '1',
     name: 'App Server (Via Proxy)',
-    host: '192.168.10.31',
+    host: '10.0.0.31',
     type: 'ssh',
     port: 22,
     username: 'appuser',
     environment: 'Production',
     tags: ['app-server', 'reverse-proxy', 'linux'],
-    notes: 'Routes via Reverse Proxy 192.168.15.58',
+    notes: 'Routes via Bastion Jump Host',
     proxyType: 'jump',
-    proxyHost: '192.168.15.58',
+    proxyHost: 'bastion.example.com',
     proxyUsername: 'proxyuser',
   },
   
@@ -351,12 +433,16 @@ ipcMain.handle('launch-ssh', async (event, server) => {
     proxyKeyPath,
   } = server;
 
+  const rawPassword = decryptSecret(password);
+  const rawProxyPassword = decryptSecret(server.proxyPassword);
+  const rawKeyPassphrase = decryptSecret(server.keyPassphrase);
+
   let sshArgs = [];
 
   // Auto-copy password to clipboard if saved
-  if (password && password.trim() !== '') {
+  if (rawPassword && rawPassword.trim() !== '') {
     try {
-      clipboard.writeText(password.trim());
+      clipboard.writeText(rawPassword.trim());
     } catch (e) {
       console.error('Failed to copy password to clipboard:', e);
     }
@@ -414,6 +500,27 @@ ipcMain.handle('launch-ssh', async (event, server) => {
   const fullSshCmd = `ssh ${sshArgs.join(' ')}`;
   const title = name ? `${name}` : `${host}`;
 
+  // Hands-free password auto-login sidecar execution
+  const proxyPwd = rawProxyPassword ? rawProxyPassword.trim() : '';
+  const targetPwd = rawPassword ? rawPassword.trim() : '';
+  const keyPwd = rawKeyPassphrase ? rawKeyPassphrase.trim() : '';
+
+  if (proxyPwd || targetPwd || keyPwd) {
+    const scriptPath = path.join(__dirname, 'sshAutoLogin.ps1');
+    const titleArg = `-windowTitle "${title.replace(/"/g, '`"')}"`;
+    const hostArg = `-serverHost "${finalHost.replace(/"/g, '`"')}"`;
+    const pPwdArg = proxyPwd ? `-proxyPassword "${proxyPwd.replace(/"/g, '`"')}"` : '';
+    const tPwdArg = targetPwd ? `-targetPassword "${targetPwd.replace(/"/g, '`"')}"` : '';
+    const kPwdArg = keyPwd ? `-keyPassphrase "${keyPwd.replace(/"/g, '`"')}"` : '';
+    const psCmd = `powershell.exe -ExecutionPolicy Bypass -NoProfile -File "${scriptPath}" ${titleArg} ${hostArg} ${pPwdArg} ${tPwdArg} ${kPwdArg}`;
+
+    setTimeout(() => {
+      exec(psCmd, (err) => {
+        if (err) console.error('SSH Auto-login helper error:', err);
+      });
+    }, 300);
+  }
+
   // Open as a NEW TAB in the existing Windows Terminal window (-w 0 nt)
   const wtCmd = `wt.exe -w 0 nt --title "${title}" cmd.exe /k "${fullSshCmd}"`;
   const fallbackCmd = `cmd.exe /c start "SSH - ${title}" cmd.exe /k "${fullSshCmd}"`;
@@ -427,11 +534,11 @@ ipcMain.handle('launch-ssh', async (event, server) => {
             console.error('SSH launch error:', fbErr);
             resolve({ success: false, error: fbErr.message });
           } else {
-            resolve({ success: true, command: fullSshCmd, passwordCopied: !!password, tabbed: false });
+            resolve({ success: true, command: fullSshCmd, passwordCopied: false, tabbed: false });
           }
         });
       } else {
-        resolve({ success: true, command: fullSshCmd, passwordCopied: !!password, tabbed: true });
+        resolve({ success: true, command: fullSshCmd, passwordCopied: false, tabbed: true });
       }
     });
   });
@@ -440,6 +547,7 @@ ipcMain.handle('launch-ssh', async (event, server) => {
 // 1-Tap RDP Connection Launcher (100% Passwordless Auto-Login via Windows Credential Manager)
 ipcMain.handle('launch-rdp', async (event, server) => {
   const { host, port, username, password, adminConsole, proxyType, proxyPort } = server;
+  const rawPassword = decryptSecret(password);
 
   let targetHost = host ? host.trim() : '127.0.0.1';
   let targetPort = port || 3389;
@@ -451,9 +559,9 @@ ipcMain.handle('launch-rdp', async (event, server) => {
 
   // Windows Credential Manager cmdkey integration for 100% passwordless RDP
   let cmdPrefix = '';
-  if (username && username.trim() && password && password.trim()) {
+  if (username && username.trim() && rawPassword && rawPassword.trim()) {
     const credTarget = `TERMSRV/${targetHost}`;
-    cmdPrefix = `cmdkey /generic:${credTarget} /user:${username.trim()} /pass:"${password.trim()}" && `;
+    cmdPrefix = `cmdkey /generic:${credTarget} /user:${username.trim()} /pass:"${rawPassword.trim()}" && `;
   }
 
   let rdpArgs = [`/v:${targetHost}:${targetPort}`];
@@ -470,17 +578,105 @@ ipcMain.handle('launch-rdp', async (event, server) => {
         console.error('RDP launch error:', error);
         resolve({ success: false, error: error.message });
       } else {
-        resolve({ success: true, command: fullCmd, autoLoggedIn: !!(username && password) });
+        resolve({ success: true, command: fullCmd, autoLoggedIn: !!(username && rawPassword) });
       }
     });
   });
 });
 
-// Ping host (ICMP / TCP socket check)
-ipcMain.handle('ping-host', async (event, { host, port }) => {
-  const startTime = Date.now();
-  const testPort = port || 22;
+// Proxy-Aware & Multistage Server Health Checker
+ipcMain.handle('ping-host', async (event, payload) => {
+  const { host, port, type, environment, proxyType, proxyHost, proxyPort } = payload || {};
+  if (!host || typeof host !== 'string' || host.trim() === '') {
+    return { host: '', status: 'offline', latency: null };
+  }
 
+  const rawHost = host.trim();
+  let cleanHost = rawHost.replace(/^https?:\/\//i, '').split('/')[0].split(':')[0];
+  const startTime = Date.now();
+
+  // Helper to check if an IP / hostname is a private/internal network address
+  const isPrivateAddress = (addr) => {
+    if (!addr) return false;
+    const lower = addr.toLowerCase();
+    if (lower.startsWith('10.') || lower.startsWith('192.168.') || lower.endsWith('.internal') || lower.endsWith('.local')) return true;
+    if (lower.startsWith('172.')) {
+      const parts = lower.split('.');
+      if (parts.length >= 2) {
+        const secondOctet = parseInt(parts[1], 10);
+        if (secondOctet >= 16 && secondOctet <= 31) return true;
+      }
+    }
+    return false;
+  };
+
+  // If host is a private IP/domain AND is routed via Bastion Jump Host, test the Proxy Host reachability
+  let targetHostToProbe = cleanHost;
+  let targetPortToProbe = port ? parseInt(port) : null;
+  let isRoutingViaProxy = false;
+
+  if (proxyHost && proxyHost.trim() !== '' && proxyType && proxyType !== 'none') {
+    const cleanProxyHost = proxyHost.trim().replace(/^https?:\/\//i, '').split('/')[0].split(':')[0];
+    if (isPrivateAddress(cleanHost)) {
+      targetHostToProbe = cleanProxyHost;
+      targetPortToProbe = proxyPort ? parseInt(proxyPort) : 22;
+      isRoutingViaProxy = true;
+    }
+  }
+
+  if (!targetPortToProbe) {
+    if (type === 'rdp') targetPortToProbe = 3389;
+    else if (type === 'website' || environment === 'Websites' || rawHost.startsWith('http')) targetPortToProbe = 443;
+    else targetPortToProbe = 22;
+  }
+
+  // Helper for ICMP Shell Ping Fallback
+  const tryIcmpPing = (target) => {
+    return new Promise((resolve) => {
+      const pingCmd = `ping -n 1 -w 2500 ${target}`;
+      exec(pingCmd, (pErr, stdout) => {
+        if (!pErr && stdout.includes('TTL=')) {
+          const match = stdout.match(/time[=<](\d+)ms/i);
+          const latency = match ? parseInt(match[1]) : (Date.now() - startTime);
+          resolve({ host, status: 'online', latency });
+        } else {
+          resolve({ host, status: 'offline', latency: null });
+        }
+      });
+    });
+  };
+
+  // Helper for HTTP/HTTPS Probe
+  const tryHttpCheck = (target, targetPort) => {
+    return new Promise((resolve) => {
+      const isHttps = targetPort === 443 || rawHost.startsWith('https');
+      const mod = isHttps ? require('https') : require('http');
+      const reqUrl = (rawHost.startsWith('http') ? rawHost : (isHttps ? 'https://' : 'http://') + target);
+      
+      try {
+        const req = mod.get(reqUrl, { timeout: 2500, rejectUnauthorized: false }, (res) => {
+          const latency = Date.now() - startTime;
+          req.destroy();
+          resolve({ host, status: 'online', latency });
+        });
+
+        req.on('error', async () => {
+          const icmpRes = await tryIcmpPing(target);
+          resolve(icmpRes);
+        });
+
+        req.on('timeout', async () => {
+          req.destroy();
+          const icmpRes = await tryIcmpPing(target);
+          resolve(icmpRes);
+        });
+      } catch (e) {
+        tryIcmpPing(target).then(resolve);
+      }
+    });
+  };
+
+  // Stage 1: TCP Socket Check
   return new Promise((resolve) => {
     const socket = new net.Socket();
     let isResolved = false;
@@ -495,31 +691,35 @@ ipcMain.handle('ping-host', async (event, { host, port }) => {
       resolve({ host, status: 'online', latency });
     });
 
-    socket.on('error', () => {
+    socket.on('error', async () => {
       if (isResolved) return;
       isResolved = true;
       socket.destroy();
-      
-      const pingCmd = `ping -n 1 -w 2000 ${host}`;
-      exec(pingCmd, (pErr, stdout) => {
-        if (!pErr && stdout.includes('TTL=')) {
-          const match = stdout.match(/time[=<](\d+)ms/i);
-          const latency = match ? parseInt(match[1]) : (Date.now() - startTime);
-          resolve({ host, status: 'online', latency });
-        } else {
-          resolve({ host, status: 'offline', latency: null });
-        }
-      });
+
+      if (!isRoutingViaProxy && (type === 'website' || environment === 'Websites' || targetPortToProbe === 443 || targetPortToProbe === 80)) {
+        const httpRes = await tryHttpCheck(targetHostToProbe, targetPortToProbe);
+        resolve(httpRes);
+      } else {
+        const icmpRes = await tryIcmpPing(targetHostToProbe);
+        resolve(icmpRes);
+      }
     });
 
-    socket.on('timeout', () => {
+    socket.on('timeout', async () => {
       if (isResolved) return;
       isResolved = true;
       socket.destroy();
-      resolve({ host, status: 'offline', latency: null });
+
+      if (!isRoutingViaProxy && (type === 'website' || environment === 'Websites' || targetPortToProbe === 443 || targetPortToProbe === 80)) {
+        const httpRes = await tryHttpCheck(targetHostToProbe, targetPortToProbe);
+        resolve(httpRes);
+      } else {
+        const icmpRes = await tryIcmpPing(targetHostToProbe);
+        resolve(icmpRes);
+      }
     });
 
-    socket.connect(testPort, host);
+    socket.connect(targetPortToProbe, targetHostToProbe);
   });
 });
 
@@ -581,16 +781,19 @@ ipcMain.handle('import-ssh-config', async () => {
 
 // Data persistence IPCs
 ipcMain.handle('get-servers', async () => {
-  return loadJsonFile(getServersFilePath(), sampleServers);
+  const loaded = loadJsonFile(getServersFilePath(), sampleServers);
+  return (loaded || []).map(prepareServerFromStorage);
 });
 
 ipcMain.handle('save-servers', async (event, servers) => {
-  return saveJsonFile(getServersFilePath(), servers);
+  const sanitized = (servers || []).map(sanitizeServerForStorage);
+  return saveJsonFile(getServersFilePath(), sanitized);
 });
 
 ipcMain.handle('get-settings', async () => {
   const loaded = loadJsonFile(getSettingsFilePath(), defaultSettings);
-  return { ...loaded, hotkey: activeHotkey };
+  const prepared = prepareSettingsFromStorage(loaded);
+  return { ...prepared, hotkey: activeHotkey };
 });
 
 ipcMain.handle('get-active-hotkey', async () => {
@@ -598,7 +801,8 @@ ipcMain.handle('get-active-hotkey', async () => {
 });
 
 ipcMain.handle('save-settings', async (event, settings) => {
-  const result = saveJsonFile(getSettingsFilePath(), settings);
+  const sanitized = sanitizeSettingsForStorage(settings);
+  const result = saveJsonFile(getSettingsFilePath(), sanitized);
   configureAutoStart(settings.autoStartOnBoot !== false);
   registerHotkeys();
   if (mainWindow && settings.alwaysOnTop !== undefined) {
@@ -658,71 +862,46 @@ ipcMain.handle('resize-window', (event, { width, height }) => {
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
-// 2. Launch Website in Microsoft Edge & Auto-Type Credentials
+// 2. Launch Website in Microsoft Edge & Auto-Fill Credentials via Windows UI Automation Sidecar
 ipcMain.handle('launch-website', async (event, server) => {
   try {
-    let url = server.host.trim();
+    let url = server.host ? server.host.trim() : '';
+    if (!url) return { success: false, error: 'Empty URL provided' };
+
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
 
     const { username, password } = server;
+    const rawPassword = decryptSecret(password);
 
     // 1. Copy password to clipboard as a 1-tap backup
-    if (password && password.trim() !== '') {
+    if (rawPassword && rawPassword.trim() !== '') {
       try {
-        clipboard.writeText(password.trim());
+        clipboard.writeText(rawPassword.trim());
       } catch (e) {}
     }
 
-    // 2. Launch ONLY Microsoft Edge (Single Window)
+    // 2. Launch Microsoft Edge natively in user's default browser window
     const cmd = `start msedge "${url}"`;
     exec(cmd, { shell: 'cmd.exe' });
 
-    // 3. If credentials exist, run background PowerShell Set-Clipboard + Ctrl+V script for 100% unescaped literal character support
-    if (username || password) {
-      const escapePsSingleQuote = (str) => {
-        if (!str) return '';
-        return str.replace(/'/g, "''");
-      };
+    // 3. Execute ServerTap Windows UI Automation Sidecar (Native OS Accessibility API)
+    if (username || rawPassword) {
+      const sidecarExe = path.join(__dirname, 'ServerTapUiaSidecar.exe');
+      const uStr = username ? username.trim() : '';
+      const pStr = rawPassword ? rawPassword.trim() : '';
 
-      const userStr = escapePsSingleQuote(username);
-      const passStr = escapePsSingleQuote(password);
-
-      // PowerShell script: Uses Set-Clipboard + Ctrl+V (^v) so ALL characters (@, #, $, %, +, ^, ~, !, *, {, }, etc.) paste 100% literally!
-      const psScript = `
-        $wshell = New-Object -ComObject wscript.shell;
-        $wshell.AppActivate('Edge');
-        Start-Sleep -Milliseconds 2500;
-
-        # Move focus from Address Bar to Username Input Box
-        $wshell.SendKeys('{TAB}');
-        Start-Sleep -Milliseconds 300;
-
-        if ('${userStr}') {
-          Set-Clipboard -Value '${userStr}';
-          $wshell.SendKeys('^v');
-          Start-Sleep -Milliseconds 400;
-        }
-
-        # Tab to Password Input Box
-        $wshell.SendKeys('{TAB}');
-        Start-Sleep -Milliseconds 300;
-
-        if ('${passStr}') {
-          Set-Clipboard -Value '${passStr}';
-          $wshell.SendKeys('^v');
-          Start-Sleep -Milliseconds 400;
-        }
-
-        $wshell.SendKeys('{ENTER}');
-      `;
-
-      const encodedScript = Buffer.from(psScript, 'utf16le').toString('base64');
-      exec(`powershell -EncodedCommand ${encodedScript}`, { shell: 'cmd.exe' });
+      if (fs.existsSync(sidecarExe)) {
+        execFile(sidecarExe, [url, uStr, pStr], (err, stdout, stderr) => {
+          if (err) {
+            console.error('UIA Sidecar execution error:', err);
+          }
+        });
+      }
     }
 
-    return { success: true, autoLoggedIn: !!(username || password) };
+    return { success: true, mode: 'external', autoLoggedIn: !!(username || rawPassword) };
   } catch (err) {
     return { success: false, error: err.message };
   }

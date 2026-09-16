@@ -4,6 +4,7 @@ import ServerCard from './components/ServerCard';
 import AddServerModal from './components/AddServerModal';
 import SshImporterModal from './components/SshImporterModal';
 import SettingsModal from './components/SettingsModal';
+import ProxyModal from './components/ProxyModal';
 import { Terminal, Monitor, Server, AlertCircle, RefreshCw, Layers, ShieldCheck } from 'lucide-react';
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
   const [editingServer, setEditingServer] = useState(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isProxyModalOpen, setIsProxyModalOpen] = useState(false);
 
   // Initial load
   useEffect(() => {
@@ -188,7 +190,15 @@ export default function App() {
   // Manual Ping
   const handlePingServer = async (server) => {
     if (window.api && window.api.pingHost) {
-      const res = await window.api.pingHost({ host: server.host, port: server.port });
+      const res = await window.api.pingHost({
+        host: server.host,
+        port: server.port,
+        type: server.type,
+        environment: server.environment,
+        proxyType: server.proxyType,
+        proxyHost: server.proxyHost,
+        proxyPort: server.proxyPort,
+      });
       const updated = servers.map((s) =>
         s.id === server.id ? { ...s, status: res.status, latency: res.latency } : s
       );
@@ -307,16 +317,76 @@ export default function App() {
 
   const environments = ['Production', 'Staging', 'Tunnels', 'VPN', 'Websites', 'Other'];
 
-  // Reorder Server Position
-  const handleMoveServer = (index, direction) => {
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= servers.length) return;
+  // Reorder Server Position using server.id (works across all environment filters)
+  const handleMoveServer = (serverId, direction) => {
+    const filteredIdx = filteredServers.findIndex((s) => s.id === serverId);
+    if (filteredIdx === -1) return;
+
+    const targetFilteredIdx = direction === 'up' ? filteredIdx - 1 : filteredIdx + 1;
+    if (targetFilteredIdx < 0 || targetFilteredIdx >= filteredServers.length) return;
+
+    const targetServerId = filteredServers[targetFilteredIdx].id;
+
+    const globalSrcIdx = servers.findIndex((s) => s.id === serverId);
+    const globalTargetIdx = servers.findIndex((s) => s.id === targetServerId);
+
+    if (globalSrcIdx === -1 || globalTargetIdx === -1) return;
 
     const newList = [...servers];
-    const [moved] = newList.splice(index, 1);
-    newList.splice(targetIndex, 0, moved);
+    const [moved] = newList.splice(globalSrcIdx, 1);
+    newList.splice(globalTargetIdx, 0, moved);
 
     saveServersList(newList);
+  };
+
+  // Drag and Drop Server Reordering State (ID-based)
+  const [draggedId, setDraggedId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+
+  const handleDragStart = (e, serverId) => {
+    setDraggedId(serverId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', serverId);
+  };
+
+  const handleDragOver = (e, serverId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverId !== serverId) {
+      setDragOverId(serverId);
+    }
+  };
+
+  const handleDrop = (e, targetServerId) => {
+    e.preventDefault();
+    if (!draggedId || draggedId === targetServerId) {
+      setDraggedId(null);
+      setDragOverId(null);
+      return;
+    }
+
+    const draggedIndex = servers.findIndex((s) => s.id === draggedId);
+    const targetIndex = servers.findIndex((s) => s.id === targetServerId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedId(null);
+      setDragOverId(null);
+      return;
+    }
+
+    const newList = [...servers];
+    const [draggedItem] = newList.splice(draggedIndex, 1);
+    newList.splice(targetIndex, 0, draggedItem);
+
+    saveServersList(newList);
+    setDraggedId(null);
+    setDragOverId(null);
+    showToast(`Reordered ${draggedItem.name}`, 'info');
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDragOverId(null);
   };
 
   return (
@@ -331,6 +401,7 @@ export default function App() {
           setEditingServer(null);
           setIsAddModalOpen(true);
         }}
+        onOpenProxyModal={() => setIsProxyModalOpen(true)}
         onOpenImportModal={() => setIsImportModalOpen(true)}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onCopyPublicKey={handleCopyPublicKey}
@@ -405,8 +476,14 @@ export default function App() {
                 }}
                 onDelete={handleDeleteServer}
                 onPing={handlePingServer}
-                onMoveUp={(i) => handleMoveServer(i, 'up')}
-                onMoveDown={(i) => handleMoveServer(i, 'down')}
+                onMoveUp={() => handleMoveServer(server.id, 'up')}
+                onMoveDown={() => handleMoveServer(server.id, 'down')}
+                onDragStart={(e) => handleDragStart(e, server.id)}
+                onDragOver={(e) => handleDragOver(e, server.id)}
+                onDrop={(e) => handleDrop(e, server.id)}
+                onDragEnd={handleDragEnd}
+                isDragging={draggedId === server.id}
+                isDragOver={dragOverId === server.id}
               />
             ))}
           </div>
@@ -463,6 +540,7 @@ export default function App() {
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleSaveServer}
         editingServer={editingServer}
+        proxyProfiles={settings.proxyProfiles || []}
       />
 
       <SshImporterModal
@@ -478,6 +556,13 @@ export default function App() {
         onSaveSettings={handleSaveSettings}
         onExportData={handleExportData}
         onImportData={handleImportJsonData}
+      />
+
+      <ProxyModal
+        isOpen={isProxyModalOpen}
+        onClose={() => setIsProxyModalOpen(false)}
+        proxyProfiles={settings.proxyProfiles || []}
+        onSaveProxyProfiles={(newProfiles) => handleSaveSettings({ ...settings, proxyProfiles: newProfiles })}
       />
     </div>
   );

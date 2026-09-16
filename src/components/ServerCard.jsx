@@ -1,7 +1,26 @@
 import React, { useState } from 'react';
-import { Globe, Terminal, Monitor, Copy, Check, Edit2, Trash2, Shield, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
+import { Globe, Terminal, Monitor, Copy, Check, Edit2, Trash2, Shield, GripVertical } from 'lucide-react';
 
-export default function ServerCard({ server, index, isFirst, isLast, onLaunchSsh, onLaunchRdp, onLaunchWebsite, onEdit, onDelete, onPing, onMoveUp, onMoveDown }) {
+export default function ServerCard({
+  server,
+  index,
+  isFirst,
+  isLast,
+  onLaunchSsh,
+  onLaunchRdp,
+  onLaunchWebsite,
+  onEdit,
+  onDelete,
+  onPing,
+  onMoveUp,
+  onMoveDown,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  isDragging,
+  isDragOver
+}) {
   const [copied, setCopied] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [pinging, setPinging] = useState(false);
@@ -68,28 +87,29 @@ export default function ServerCard({ server, index, isFirst, isLast, onLaunchSsh
   };
 
   return (
-    <div className="glass-card rounded-xl p-3 flex flex-col gap-2 group relative border border-white/10 hover:border-white/20 transition-all duration-150">
-      {/* Row 1: Position Controls + Server Name + Environment Badge + Ping */}
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={`glass-card rounded-xl p-3 flex flex-col gap-2 group relative border transition-all duration-150 ${
+        isDragging
+          ? 'opacity-30 border-dashed border-cyan-400 bg-cyan-950/20 scale-[0.98]'
+          : isDragOver
+          ? 'border-2 border-cyan-400 bg-cyan-950/60 shadow-xl shadow-cyan-500/30 scale-[1.02]'
+          : 'border-white/10 hover:border-white/20'
+      }`}
+    >
+      {/* Row 1: Drag Grip Handle + Server Name + Environment Badge + Ping */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          {/* Server Position Reorder Controls */}
-          <div className="flex items-center gap-0.5 text-slate-500 bg-slate-900/60 p-0.5 rounded border border-white/5 flex-shrink-0">
-            <button
-              onClick={() => onMoveUp(index)}
-              disabled={isFirst}
-              className="p-0.5 hover:text-cyan-300 disabled:opacity-20 disabled:hover:text-slate-500 transition"
-              title="Move Server Up"
-            >
-              <ChevronUp className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() => onMoveDown(index)}
-              disabled={isLast}
-              className="p-0.5 hover:text-cyan-300 disabled:opacity-20 disabled:hover:text-slate-500 transition"
-              title="Move Server Down"
-            >
-              <ChevronDown className="w-3 h-3" />
-            </button>
+          {/* Drag Handle */}
+          <div
+            className="flex items-center text-slate-400 hover:text-cyan-300 bg-slate-900/60 hover:bg-slate-800/80 px-1 py-0.5 rounded border border-white/5 cursor-grab active:cursor-grabbing transition flex-shrink-0"
+            title="Click & Drag to reorder server position"
+          >
+            <GripVertical className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-400" />
           </div>
 
           <h3 className="font-bold text-slate-100 text-xs tracking-wide group-hover:text-cyan-300 transition truncate">
