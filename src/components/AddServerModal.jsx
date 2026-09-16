@@ -10,6 +10,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer,
     username: '',
     authType: 'key',
     keyPath: '',
+    keyPassphrase: '',
     environment: 'Production',
     tags: '',
     notes: '',
@@ -29,6 +30,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer,
   const [selectedProxyProfileId, setSelectedProxyProfileId] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showProxyPassword, setShowProxyPassword] = useState(false);
+  const [showKeyPassphrase, setShowKeyPassphrase] = useState(false);
 
   useEffect(() => {
     if (editingServer) {
@@ -44,6 +46,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer,
         username: editingServer.username || '',
         authType: editingServer.authType || 'key',
         keyPath: editingServer.keyPath || '',
+        keyPassphrase: editingServer.keyPassphrase || '',
         environment: editingServer.environment || 'Production',
         tags: editingServer.tags ? editingServer.tags.join(', ') : '',
         notes: editingServer.notes || '',
@@ -69,6 +72,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer,
         username: '',
         authType: 'key',
         keyPath: '',
+        keyPassphrase: '',
         environment: 'Production',
         tags: '',
         notes: '',
@@ -127,6 +131,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer,
       username: formData.username.trim(),
       authType: formData.authType,
       keyPath: formData.keyPath.trim(),
+      keyPassphrase: formData.keyPassphrase.trim(),
       environment: formData.environment,
       tags: tagsArray,
       notes: formData.notes.trim(),
@@ -507,6 +512,30 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer,
                 onChange={(e) => setFormData({ ...formData, keyPath: e.target.value })}
                 className="w-full px-3 py-2 bg-slate-800/80 border border-white/10 rounded-lg text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-cyan-500"
               />
+            </div>
+
+            <div className="relative">
+              <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                <span>Key Passphrase (Optional)</span>
+                <span className="text-[10px] text-cyan-400 font-normal">Encrypted</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showKeyPassphrase ? 'text' : 'password'}
+                  placeholder="Passphrase for id_rsa / id_ed25519"
+                  value={formData.keyPassphrase}
+                  onChange={(e) => setFormData({ ...formData, keyPassphrase: e.target.value })}
+                  className="w-full pl-3 pr-8 py-2 bg-slate-800/80 border border-white/10 rounded-lg text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-cyan-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKeyPassphrase(!showKeyPassphrase)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  title={showKeyPassphrase ? 'Hide Passphrase' : 'Show Passphrase'}
+                >
+                  {showKeyPassphrase ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
           </div>
 

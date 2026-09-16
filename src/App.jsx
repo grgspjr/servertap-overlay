@@ -190,7 +190,15 @@ export default function App() {
   // Manual Ping
   const handlePingServer = async (server) => {
     if (window.api && window.api.pingHost) {
-      const res = await window.api.pingHost({ host: server.host, port: server.port });
+      const res = await window.api.pingHost({
+        host: server.host,
+        port: server.port,
+        type: server.type,
+        environment: server.environment,
+        proxyType: server.proxyType,
+        proxyHost: server.proxyHost,
+        proxyPort: server.proxyPort,
+      });
       const updated = servers.map((s) =>
         s.id === server.id ? { ...s, status: res.status, latency: res.latency } : s
       );
