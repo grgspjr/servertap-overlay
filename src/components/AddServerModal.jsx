@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Server, Key, Shield, Tag, Terminal, Monitor, FileText, Lock, Eye, EyeOff } from 'lucide-react';
 
-export default function AddServerModal({ isOpen, onClose, onSave, editingServer }) {
+export default function AddServerModal({ isOpen, onClose, onSave, editingServer, proxyProfiles = [] }) {
   const [formData, setFormData] = useState({
     name: '',
     host: '',
@@ -26,10 +26,16 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
     browserEngine: 'external',
   });
 
+  const [selectedProxyProfileId, setSelectedProxyProfileId] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showProxyPassword, setShowProxyPassword] = useState(false);
 
   useEffect(() => {
     if (editingServer) {
+      const match = (proxyProfiles || []).find(
+        (p) => p.host === editingServer.proxyHost && (p.username || '') === (editingServer.proxyUsername || '')
+      );
+      setSelectedProxyProfileId(match ? match.id : '');
       setFormData({
         name: editingServer.name || '',
         host: editingServer.host || '',
@@ -54,6 +60,7 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
         browserEngine: editingServer.browserEngine || 'external',
       });
     } else {
+      setSelectedProxyProfileId('');
       setFormData({
         name: '',
         host: '',
@@ -78,7 +85,27 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
         browserEngine: 'external',
       });
     }
-  }, [editingServer, isOpen]);
+  }, [editingServer, isOpen, proxyProfiles]);
+
+  const handleProxyProfileChange = (e) => {
+    const profileId = e.target.value;
+    setSelectedProxyProfileId(profileId);
+
+    if (!profileId) return;
+
+    const selected = (proxyProfiles || []).find((p) => p.id === profileId);
+    if (selected) {
+      setFormData((prev) => ({
+        ...prev,
+        proxyType: selected.proxyType || prev.proxyType || 'jump',
+        proxyHost: selected.host || '',
+        proxyPort: selected.port ? String(selected.port) : '',
+        proxyUsername: selected.username || '',
+        proxyPassword: selected.proxyPassword || '',
+        proxyKeyPath: selected.keyPath || prev.proxyKeyPath || '',
+      }));
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -247,6 +274,27 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
 
             {formData.proxyType !== 'none' && (
               <div className="space-y-3 pt-2 border-t border-white/5 animate-fade-in">
+                {/* Select Saved Proxy Profile Dropdown */}
+                {proxyProfiles && proxyProfiles.length > 0 && (
+                  <div className="p-2 rounded-lg bg-cyan-950/40 border border-cyan-500/30">
+                    <label className="block text-[11px] font-semibold text-cyan-300 mb-1">
+                      Select Saved Reverse Proxy Preset
+                    </label>
+                    <select
+                      value={selectedProxyProfileId}
+                      onChange={handleProxyProfileChange}
+                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-cyan-500/40 rounded text-xs text-cyan-200 font-medium focus:outline-none focus:border-cyan-400"
+                    >
+                      <option value="">-- Custom / Manual Proxy Input --</option>
+                      {proxyProfiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.host}) [{p.proxyType || 'jump'}]
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {formData.proxyType === 'jump' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
@@ -255,9 +303,12 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. 192.168.15.58 or bastion.company.com"
+                        placeholder="e.g. 10.0.0.50 or bastion.company.com"
                         value={formData.proxyHost}
-                        onChange={(e) => setFormData({ ...formData, proxyHost: e.target.value })}
+                        onChange={(e) => {
+                          setSelectedProxyProfileId('');
+                          setFormData({ ...formData, proxyHost: e.target.value });
+                        }}
                         className="w-full px-2.5 py-1.5 bg-slate-900 border border-white/10 rounded text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
                       />
                     </div>
@@ -272,6 +323,29 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer 
                         onChange={(e) => setFormData({ ...formData, proxyUsername: e.target.value })}
                         className="w-full px-2.5 py-1.5 bg-slate-900 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-cyan-500"
                       />
+                    </div>
+                    <div className="relative">
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                        <span>Proxy Password (Optional)</span>
+                        <span className="text-[10px] text-cyan-400 font-normal">Auto-fill</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showProxyPassword ? 'text' : 'password'}
+                          placeholder="Separate proxy password"
+                          value={formData.proxyPassword}
+                          onChange={(e) => setFormData({ ...formData, proxyPassword: e.target.value })}
+                          className="w-full pl-2.5 pr-8 py-1.5 bg-slate-900 border border-white/10 rounded text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowProxyPassword(!showProxyPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                          title={showProxyPassword ? 'Hide Password' : 'Show Password'}
+                        >
+                          {showProxyPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-300 mb-1">

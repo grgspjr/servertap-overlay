@@ -94,15 +94,15 @@ const sampleServers = [
   {
     id: '1',
     name: 'App Server (Via Proxy)',
-    host: '192.168.10.31',
+    host: '10.0.0.31',
     type: 'ssh',
     port: 22,
     username: 'appuser',
     environment: 'Production',
     tags: ['app-server', 'reverse-proxy', 'linux'],
-    notes: 'Routes via Reverse Proxy 192.168.15.58',
+    notes: 'Routes via Bastion Jump Host',
     proxyType: 'jump',
-    proxyHost: '192.168.15.58',
+    proxyHost: 'bastion.example.com',
     proxyUsername: 'proxyuser',
   },
   
@@ -416,6 +416,23 @@ ipcMain.handle('launch-ssh', async (event, server) => {
 
   const fullSshCmd = `ssh ${sshArgs.join(' ')}`;
   const title = name ? `${name}` : `${host}`;
+
+  // Hands-free password auto-typer helper execution
+  const proxyPwd = server.proxyPassword ? server.proxyPassword.trim() : '';
+  const targetPwd = password ? password.trim() : '';
+
+  if (proxyPwd || targetPwd) {
+    const scriptPath = path.join(__dirname, 'sshAutoLogin.ps1');
+    const pPwdArg = proxyPwd ? `-proxyPassword "${proxyPwd.replace(/"/g, '`"')}"` : '';
+    const tPwdArg = targetPwd ? `-targetPassword "${targetPwd.replace(/"/g, '`"')}"` : '';
+    const psCmd = `powershell.exe -ExecutionPolicy Bypass -NoProfile -File "${scriptPath}" ${pPwdArg} ${tPwdArg}`;
+
+    setTimeout(() => {
+      exec(psCmd, (err) => {
+        if (err) console.error('SSH Auto-login helper error:', err);
+      });
+    }, 400);
+  }
 
   // Open as a NEW TAB in the existing Windows Terminal window (-w 0 nt)
   const wtCmd = `wt.exe -w 0 nt --title "${title}" cmd.exe /k "${fullSshCmd}"`;

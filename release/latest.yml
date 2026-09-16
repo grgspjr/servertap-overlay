@@ -1,8 +1,8 @@
 version: 2.2.2-beta
 files:
   - url: ServerTap-DevOps-Overlay-Setup-2.2.2-beta.exe
-    sha512: uBLVBqzmy5f7ApzpfCLoAc2wpoAMlncoa4r3aamlwzt3FaMsWnxcO5ZNpeNfjXz7x8JK0J0DxDHXjkt7bjJS2g==
-    size: 77795153
+    sha512: ORnnIYEDDXO29QgRVSGyBsM1Bp8OMmNMIsPkwELocqD1s6MQBb+0rLLMDq/0fAUZ2NchNuIlMRQ4Rrr9Vy5Gzw==
+    size: 77795527
 path: ServerTap-DevOps-Overlay-Setup-2.2.2-beta.exe
-sha512: uBLVBqzmy5f7ApzpfCLoAc2wpoAMlncoa4r3aamlwzt3FaMsWnxcO5ZNpeNfjXz7x8JK0J0DxDHXjkt7bjJS2g==
-releaseDate: '2026-09-15T18:12:43.951Z'
+sha512: ORnnIYEDDXO29QgRVSGyBsM1Bp8OMmNMIsPkwELocqD1s6MQBb+0rLLMDq/0fAUZ2NchNuIlMRQ4Rrr9Vy5Gzw==
+releaseDate: '2026-09-15T19:00:17.582Z'

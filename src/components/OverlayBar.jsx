@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, FileDown, Settings, Terminal, Key } from 'lucide-react';
+import { Search, Plus, FileDown, Settings, Terminal, Key, Shield } from 'lucide-react';
 
 export default function OverlayBar({
   searchQuery,
@@ -7,6 +7,7 @@ export default function OverlayBar({
   selectedEnv,
   setSelectedEnv,
   onOpenAddModal,
+  onOpenProxyModal,
   onOpenImportModal,
   onOpenSettingsModal,
   onCopyPublicKey,
@@ -41,6 +42,15 @@ export default function OverlayBar({
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Server</span>
+          </button>
+
+          <button
+            onClick={onOpenProxyModal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-cyan-200 bg-slate-800/90 hover:bg-slate-700/90 rounded-md transition border border-cyan-500/30 hover:border-cyan-400"
+            title="Add or Manage Reverse Proxy Profiles"
+          >
+            <Shield className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Add Proxy</span>
           </button>
 
           <button
