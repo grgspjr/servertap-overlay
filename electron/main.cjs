@@ -156,6 +156,11 @@ const defaultSettings = {
 function configureAutoStart(enable) {
   try {
     if (process.platform === 'win32') {
+      // Skip auto-start registration in development mode (npm run dev)
+      if (!app.isPackaged) {
+        console.log('Skipping auto-start registration in development mode');
+        return;
+      }
       app.setLoginItemSettings({
         openAtLogin: enable !== false,
         path: app.getPath('exe'),
