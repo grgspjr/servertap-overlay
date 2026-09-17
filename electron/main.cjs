@@ -161,12 +161,29 @@ function configureAutoStart(enable) {
         console.log('Skipping auto-start registration in development mode');
         return;
       }
-      app.setLoginItemSettings({
-        openAtLogin: enable !== false,
-        path: app.getPath('exe'),
-        args: ['--hidden']
-      });
-      console.log(`Windows Auto-Start on boot configured: ${enable !== false}`);
+
+      const exePath = app.getPath('exe');
+      const regKey = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
+      const valueName = 'ServerTapDevOpsOverlay';
+
+      if (enable !== false) {
+        // Double-quote executable path to handle spaces in folder path (e.g. C:\Users\NBS - Greg)
+        const cmd = `reg add "${regKey}" /v "${valueName}" /t REG_SZ /d "\\"${exePath}\\" --hidden" /f`;
+        exec(cmd, (err) => {
+          if (err) console.error('Failed to set registry auto-start:', err);
+          else console.log('Successfully configured Windows Startup Registry for ServerTap');
+        });
+
+        app.setLoginItemSettings({
+          openAtLogin: true,
+          path: exePath,
+          args: ['--hidden']
+        });
+      } else {
+        const cmd = `reg delete "${regKey}" /v "${valueName}" /f`;
+        exec(cmd, () => {});
+        app.setLoginItemSettings({ openAtLogin: false });
+      }
     }
   } catch (err) {
     console.error('Failed to set login item settings:', err);
