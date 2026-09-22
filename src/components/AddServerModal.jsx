@@ -122,6 +122,8 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer,
       .map((t) => t.trim())
       .filter(Boolean);
 
+    const isProxy = formData.proxyType && formData.proxyType !== 'none';
+
     const savedData = {
       id: editingServer ? editingServer.id : String(Date.now()),
       name: formData.name.trim(),
@@ -136,14 +138,14 @@ export default function AddServerModal({ isOpen, onClose, onSave, editingServer,
       tags: tagsArray,
       notes: formData.notes.trim(),
       customCommand: formData.customCommand.trim(),
-      proxyType: formData.proxyType,
-      proxyHost: formData.proxyHost.trim(),
-      proxyPort: formData.proxyPort ? parseInt(formData.proxyPort) : null,
-      targetPort: formData.targetPort ? parseInt(formData.targetPort) : null,
+      proxyType: formData.proxyType || 'none',
+      proxyHost: isProxy ? formData.proxyHost.trim() : '',
+      proxyPort: isProxy && formData.proxyPort ? parseInt(formData.proxyPort) : null,
+      targetPort: isProxy && formData.targetPort ? parseInt(formData.targetPort) : null,
       noRemoteCmd: formData.noRemoteCmd !== false,
-      proxyUsername: formData.proxyUsername.trim(),
-      proxyKeyPath: formData.proxyKeyPath.trim(),
-      proxyPassword: formData.proxyPassword.trim(),
+      proxyUsername: isProxy ? formData.proxyUsername.trim() : '',
+      proxyKeyPath: isProxy ? formData.proxyKeyPath.trim() : '',
+      proxyPassword: isProxy ? formData.proxyPassword.trim() : '',
       password: formData.password.trim(),
       browserEngine: formData.browserEngine || 'external',
     };

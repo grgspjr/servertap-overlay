@@ -5,8 +5,8 @@ param(
     [string]$proxyPassword = "",
     [string]$targetPassword = "",
     [string]$keyPassphrase = "",
-    [int]$proxyDelayMs = 800,
-    [int]$targetDelayMs = 2200
+    [int]$proxyDelayMs = 1000,
+    [int]$targetDelayMs = 3500
 )
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -25,18 +25,35 @@ function Focus-Terminal {
     return $false
 }
 
+function Send-EscapedKeys {
+    param([string]$text)
+    if ([string]::IsNullOrEmpty($text)) { return }
+    
+    # Escape SendKeys reserved characters: + ^ % ~ ( ) { } [ ]
+    $escaped = ""
+    foreach ($char in $text.ToCharArray()) {
+        $c = [string]$char
+        if ("+^%~(){}[]".Contains($c)) {
+            $escaped += "{$c}"
+        } else {
+            $escaped += $c
+        }
+    }
+    [System.Windows.Forms.SendKeys]::SendWait($escaped)
+}
+
 function Paste-Password {
     param([string]$pwd, [string]$title, [string]$hostName)
     if ([string]::IsNullOrWhiteSpace($pwd)) { return }
     
-    # Try focusing terminal window
-    for ($i = 0; $i -lt 6; $i++) {
+    # Try focusing terminal window (up to 8 retries)
+    for ($i = 0; $i -lt 8; $i++) {
         $focused = Focus-Terminal -title $title -hostName $hostName
         if ($focused) { break }
         Start-Sleep -Milliseconds 250
     }
     
-    Start-Sleep -Milliseconds 200
+    Start-Sleep -Milliseconds 250
 
     try {
         [System.Windows.Forms.Clipboard]::SetText($pwd)
@@ -45,15 +62,17 @@ function Paste-Password {
         Start-Sleep -Milliseconds 150
         [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
     } catch {
-        # Fallback typing character-by-character
-        foreach ($char in $pwd.ToCharArray()) {
-            [System.Windows.Forms.SendKeys]::SendWait([string]$char)
-        }
+        # Fallback typing with reserved character escaping
+        Send-EscapedKeys -text $pwd
         [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+    } finally {
+        # Clear sensitive password from clipboard after paste
+        Start-Sleep -Milliseconds 500
+        try { [System.Windows.Forms.Clipboard]::Clear() } catch {}
     }
 }
 
-# 1. Handle Proxy Password (Prompt 1)
+# 1. Handle Proxy / Bastion Password (Prompt 1)
 if (-not [string]::IsNullOrWhiteSpace($proxyPassword)) {
     Start-Sleep -Milliseconds $proxyDelayMs
     Paste-Password -pwd $proxyPassword -title $windowTitle -hostName $serverHost

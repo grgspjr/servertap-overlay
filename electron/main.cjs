@@ -138,6 +138,23 @@ function getUserDataPath() {
   return targetDir;
 }
 
+function getScriptPath(filename) {
+  const rawPath = path.join(__dirname, filename);
+  if (!app.isPackaged && fs.existsSync(rawPath)) return rawPath;
+
+  const targetPath = path.join(getUserDataPath(), filename);
+  try {
+    if (fs.existsSync(rawPath)) {
+      const content = fs.readFileSync(rawPath);
+      fs.writeFileSync(targetPath, content);
+      return targetPath;
+    }
+  } catch (err) {
+    console.error(`Error extracting ${filename} from asar:`, err);
+  }
+  return targetPath;
+}
+
 const getServersFilePath = () => path.join(getUserDataPath(), 'servers.json');
 const getSettingsFilePath = () => path.join(getUserDataPath(), 'settings.json');
 
@@ -455,8 +472,9 @@ ipcMain.handle('launch-ssh', async (event, server) => {
     proxyKeyPath,
   } = server;
 
+  const isProxyActive = proxyType && proxyType !== 'none';
   const rawPassword = decryptSecret(password);
-  const rawProxyPassword = decryptSecret(server.proxyPassword);
+  const rawProxyPassword = isProxyActive ? decryptSecret(server.proxyPassword) : '';
   const rawKeyPassphrase = decryptSecret(server.keyPassphrase);
 
   let sshArgs = [];
@@ -523,18 +541,18 @@ ipcMain.handle('launch-ssh', async (event, server) => {
   const title = name ? `${name}` : `${host}`;
 
   // Hands-free password auto-login sidecar execution
-  const proxyPwd = rawProxyPassword ? rawProxyPassword.trim() : '';
+  const proxyPwd = (isProxyActive && rawProxyPassword) ? rawProxyPassword.trim() : '';
   const targetPwd = rawPassword ? rawPassword.trim() : '';
   const keyPwd = rawKeyPassphrase ? rawKeyPassphrase.trim() : '';
 
   if (proxyPwd || targetPwd || keyPwd) {
-    const scriptPath = path.join(__dirname, 'sshAutoLogin.ps1');
+    const scriptPath = getScriptPath('sshAutoLogin.ps1');
     const titleArg = `-windowTitle "${title.replace(/"/g, '`"')}"`;
     const hostArg = `-serverHost "${finalHost.replace(/"/g, '`"')}"`;
     const pPwdArg = proxyPwd ? `-proxyPassword "${proxyPwd.replace(/"/g, '`"')}"` : '';
     const tPwdArg = targetPwd ? `-targetPassword "${targetPwd.replace(/"/g, '`"')}"` : '';
     const kPwdArg = keyPwd ? `-keyPassphrase "${keyPwd.replace(/"/g, '`"')}"` : '';
-    const psCmd = `powershell.exe -ExecutionPolicy Bypass -NoProfile -File "${scriptPath}" ${titleArg} ${hostArg} ${pPwdArg} ${tPwdArg} ${kPwdArg}`;
+    const psCmd = `powershell.exe -STA -ExecutionPolicy Bypass -NoProfile -File "${scriptPath}" ${titleArg} ${hostArg} ${pPwdArg} ${tPwdArg} ${kPwdArg}`;
 
     setTimeout(() => {
       exec(psCmd, (err) => {
@@ -910,7 +928,7 @@ ipcMain.handle('launch-website', async (event, server) => {
 
     // 3. Execute ServerTap Windows UI Automation Sidecar (Native OS Accessibility API)
     if (username || rawPassword) {
-      const sidecarExe = path.join(__dirname, 'ServerTapUiaSidecar.exe');
+      const sidecarExe = getScriptPath('ServerTapUiaSidecar.exe');
       const uStr = username ? username.trim() : '';
       const pStr = rawPassword ? rawPassword.trim() : '';
 
